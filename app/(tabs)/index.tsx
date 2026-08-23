@@ -1,98 +1,116 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { UploadCard } from '@/components/UploadCard';
+import {tryOn, uploadClothingImage, uploadPersonImage } from '@/services/api';
+import { showImageSourceOptions } from '@/services/imagePicker';
+import type { SelectedImage } from '@/types/image';
+
+
+
+type ImageSlot = 'person' | 'clothing';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [personImage, setPersonImage] = useState<SelectedImage | null>(null);
+  const [clothingImage, setClothingImage] = useState<SelectedImage | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const saveSelectedImage = async(slot: ImageSlot, image: SelectedImage) => {
+    if (slot === 'person') {
+      setPersonImage(image);
+
+      try{
+        const result = await uploadPersonImage(image);
+        console.log('person image uploaded:',result);
+      }catch (error){
+        console.error('person image upload failed:', error);
+        Alert.alert('upload failed','could not upload your photo.');
+      }
+    } else {
+      setClothingImage(image);
+    
+
+    try {
+      const result = await uploadClothingImage(image);
+      console.log('Clothing image uploaded:', result);
+    } catch (error){
+      console.error('clothing image upload failed:',error);
+      Alert.alert('Upload failed', ' Could not upload the clothing image.');
+    }
+  }
+};
+
+  const selectImageSource = (slot: ImageSlot) => {
+    showImageSourceOptions((image) => saveSelectedImage(slot, image));
+  };
+// const handleTryOn = () => {
+//   Alert.alert('TEST', 'New Try On function is working!');
+// };
+  const handleTryOn = async () => {
+  if (!personImage || !clothingImage) {
+    Alert.alert('Missing images', 'Please select both your photo and clothing.');
+    return;
+  }
+
+  try {
+    console.log('Starting try-on...');
+
+    const result = await tryOn(personImage, clothingImage);
+
+    console.log('Try-on response:', result);
+
+    Alert.alert('Success', 'Both images were sent to the backend!');
+  } catch (error) {
+    console.error('Try-on failed:', error);
+    Alert.alert('Try-on failed', 'Could not send the images to the backend.');
+  }
+};
+
+  const canTryOn = Boolean(personImage && clothingImage);
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#FFF9F7]">
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className="gap-4 px-5 pb-8 pt-6">
+          <View className="mb-2 gap-2">
+            <Text className="text-xs font-bold tracking-[1.1px] text-[#A44A65]">
+              PERSONAL STYLE, VISUALIZED
+            </Text>
+            <Text className="text-[34px] font-bold tracking-[-0.8px] text-[#241A1D]">
+              Virtual Try-On
+            </Text>
+            <Text className="text-base leading-[23px] text-[#6F6266]">
+              Add a photo of yourself and the saree or clothing you would like to try on.
+            </Text>
+          </View>
+
+          <UploadCard
+            title="Your Photo"
+            description="Choose a clear, full-length photo for the best result."
+            imageUri={personImage?.uri ?? null}
+            onPress={() => selectImageSource('person')}
+          />
+
+          <UploadCard
+            title="Saree / Clothing"
+            description="Choose the clothing photo you would like to preview."
+            imageUri={clothingImage?.uri ?? null}
+            onPress={() => selectImageSource('clothing')}
+          />
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canTryOn }}
+            className={`mt-2 min-h-14 items-center justify-center rounded-2xl shadow-md shadow-[#6E1935]/20 ${
+              canTryOn ? 'bg-[#9D3657] active:opacity-[0.86]' : 'bg-[#E7D9DC] shadow-none'
+            }`}
+            disabled={!canTryOn}
+            onPress={handleTryOn}>
+            <Text className={`text-[17px] font-bold ${canTryOn ? 'text-white' : 'text-[#9D8A8F]'}`}>
+              Try On
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
